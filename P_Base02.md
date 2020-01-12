@@ -223,7 +223,7 @@ list01.insert(1,200)	==> [1,200,3,5,7,9,100]
 list1 += [1000, 2000]	==> [1, 400, 3, 5, 7, 100, 200, 1000, 2000]
 # 移除成员
 if 3 in list01:
-    list01.remote(3)	==> [1, 400, 5, 7, 100, 200, 1000, 2000]
+    list01.remove(3)	==> [1, 400, 5, 7, 100, 200, 1000, 2000]
 # 指定索引位置删除元素
 list1.pop(0)	==> [400, 5, 7, 100, 200, 1000, 2000]
 
@@ -231,8 +231,316 @@ list1.pop(0)	==> [400, 5, 7, 100, 200, 1000, 2000]
 
 ***知识点：***
 
+<<<<<<< HEAD
 1. `len()`获取列表长度
 
 2. `range()`：创建一个整数列表，一般用在 for 循环中。
 
    `range(start, stop[, step])`
+=======
+- `len()`：返回对象（字符、列表、元组等）长度
+
+  `len(str)`
+
+- `enumerate()`：将一个可遍历的数据对象(如列表、元组或字符串)组合为一个索引序列，同时列出数据和数据下标，一般用在 for 循环当中。返回 enumerate(枚举) 对象。
+
+  `enumerate(sequence, [start=0])`
+
+  - `sequence`：一个序列、迭代器或其他支持迭代对象。
+  - `start`：下标起始位置。
+
+- `append()`：在列表末尾添加新的对象。直接修改原来的列表，无返回值。
+
+  `list.append(obj)`
+
+  - `obj`：添加到列表末尾的对象。
+
+- `insert()`：将指定对象插入列表的指定位置。
+
+  `list.insert(index, obj)`
+
+  - `index`：指定插入索引位置。
+  - `obj`：要插入列表中的对象。
+
+- `remove()`：移除列表中某个值的第一个匹配项。
+
+  `list.remove(obj)`
+
+- `pop()`：移除列表中的一个元素（默认最后一个元素），并且返回该元素的值。
+
+  `list.pop([index=-1])`
+
+- `clear()`：清空列表，类似于 `del a[:]`。无返回值。
+
+  `list.clear()`
+
+***列表切片：***
+
+和字符串一样，列表也可以做切片操作，通过切片操作我们可以实现对列表的复制或者将列表中的一部分取出来创建出新的列表。
+
+```python
+# 列表拼接
+fruits = ['grape', 'apple', 'strawberry', 'waxberry']
+fruits += ['pitaya', 'pear', 'mango']
+# 列表切片
+fruits01 = fruits[1:4]	# apple strawberry waxberry
+# 反向切片，倒转列表
+fruits02 = fruits[::-1]	# ['mango', 'pear', 'pitaya', 'waxberry', 'strawberry', 'apple', 'grape']
+```
+
+***列表排序：***
+
+```python
+list01 = ['orange', 'apple', 'zoo', 'internationalization', 'blueberry']
+list02 = sorted(list01)
+list03 = sorted(list01,key=len,reverse=True)
+list04 = sort(list01)
+```
+
+***知识点：***
+
+- `sorted()`：对所有可迭代的对象进行排序操作。返回重新排序的列表。
+
+  `sorted(iterable, key=None, reverse=False)`
+
+  - `iterable`：可迭代对象
+  - `key`：用来进行比较的元素，指定可迭代对象中的一个元素来进行排序，如：字符串长度。
+  - `reverse`：指定排序规则。`reverse = True` 降序 ，默认升序 `reverse = False` 
+
+- **sort 与 sorted 区别：**
+  1. sort 是应用在 list 上的方法，sorted 可以对所有可迭代的对象进行排序操作。
+  2. sort 直接修改列表，内建函数 sorted 方法返回的是一个新的 list 。
+
+#### 生成式和生成器
+
+***生成器：***生成器是一个返回迭代器的函数，只能用于迭代操作，更简单点理解生成器就是一个迭代器。调用一个生成器函数，返回的是一个迭代器对象。
+
+```python
+# 使用列表的生成式语法来创建列表
+f = [x for x in range(1, 10)]	# [1, 2, 3, 4, 5, 6, 7, 8, 9]
+f = [x + y for x in 'ABC' for y in '12345']
+# ['A1', 'A2', 'A3', 'A4', 'A5', 'B1', 'B2', 'B3', 'B4', 'B5', 'C1', 'C2', 'C3', 'C4', 'C5']
+# 用列表的生成表达式语法创建列表容器
+# 用这种语法创建列表之后元素已经准备就绪所以需要耗费较多的内存空间
+f = [x ** 2 for x in range(1, 1000)]
+print(sys.getsizeof(f))  # 查看对象占用内存的字节数，9024
+print(f)	# 直接打印所有成员
+# 请注意下面的代码创建的不是一个列表而是一个生成器对象
+# 通过生成器可以获取到数据但它不占用额外的空间存储数据
+# 每次需要数据的时候就通过内部的运算得到数据(需要花费额外的时间)
+f = (x ** 2 for x in range(1, 1000))
+print(sys.getsizeof(f))  # 相比生成式生成器不占用存储数据的空间，88
+print(f)	# 错误信息：generator object
+for val in f:
+    print(val)	# 通过for循环打印所有成员
+```
+
+***补充：***除了上面提到的生成器语法，Python中还有另外一种定义生成器的方式，就是通过`yield`关键字将一个普通函数改造成生成器函数。
+
+```python
+# 实现一个生成[斐波拉切数列]的生成器
+def fib(n):
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+        yield a
+def main():
+    for val in fid(20):
+        print(val)
+if __name__ == '__main__':
+    main()
+```
+
+#### 元组
+
+Python中的元组与列表类似也是一种容器数据类型，可以用一个变量（对象）来存储多个数据，不同之处在于元组的元素不能修改。把多个元素组合到一起就形成了一个元组，它和列表一样可以保存多条数据。
+
+```python
+# 定义元组
+t = ('骆昊', 38, True, '四川成都')	# ('骆昊', 38, True, '四川成都')
+# 获取元组中的元素
+print(t[0])	# 骆昊
+# 遍历元组中的值
+for member in t:
+    print(member)
+# 重新给元组赋值
+t[0] = '王大锤'	# TypeError: 'tuple' object does not support item assignment
+# 将元组转换成列表
+person = list(t)
+print(person)	# ['骆昊', 38, True, '四川成都']
+person[0] = '李小龙'	# 列表可以修改它的元素
+person[1] = 25
+print(person)	# ['李小龙', 25, True, '四川成都']
+# 将列表转换成元组
+person_tuple = tuple(person)
+print(person_tuple)	# ('李小龙', 25, True, '四川成都')
+```
+
+***知识点：***
+
+1. 元组转列表：`list()`函数，如，`list01 = list(tuple01)`
+2. 列表转元组：`tuple()`函数，如，`tuple02 = tuple(list01)`
+
+***问题探讨：***既然有了列表这种数据结构，为什么还需要元组？
+
+1. 元组中的元素是无法修改的，不可变对象尤其适用于多线程环境。
+
+   不可变对象的优势：
+
+   ①.避免对象状态修改引起的不必要的程序错误，更加容易维护。
+
+   ②.所有线程不能修改不变对象的内部状态，实现线程安全。
+
+   ③.不变对象可以方便的被共享访问。
+
+   总结：如果不需要对元素进行添加、删除、修改的时候，首选元组。
+
+2. 元组在创建时间和占用的空间上面都优于列表。
+
+   ```python
+   print(sys.getsizeof([1,2,3,4,5]))	# 104
+   print(sys.getsizeof((1,2,3,4,5)))	# 88
+   %timeit [1,2,3,4,5]	# 66.2 ns 
+   %timeit (1,2,3,4,5)	# 16.8 ns
+   ```
+
+   ***知识点：***
+
+   `sys.getsizeof()` ：查看对象的内存占用（字节）
+
+   `%timeit`：ipython下使用，可以测量一行代码多次执行的时间，
+
+   `%time`：可以测量一行代码执行的时间
+
+#### 集合
+
+Python中的集合跟数学上的集合是一致的，不允许有重复元素，而且可以进行交集、并集、差集等运算。
+
+```python
+# 创建集合的字面量语法
+set1 = {1, 2, 3, 3, 3, 2}
+print(set1)	# {1, 2, 3}
+# 创建集合的构造器语法
+set2 = set(range(1, 10))	# {1, 2, 3, 4, 5, 6, 7, 8, 9}
+set3 = set((1, 2, 3, 3, 2, 1))	# {1, 2, 3}
+# 创建集合的推导式语法
+set4 = {num for num in range(1, 10) if num % 3 == 0 or num % 5 == 0}	# {9, 3, 5, 6}
+# 向集合添加元素和从集合删除元素
+set1.add(4)	# {1, 2, 3, 4}
+set1.update([5, 6])	# {1, 2, 3, 4, 5, 6}
+set1.discard(5)	# {1, 2, 3, 4, 6}
+if 4 in set1:
+    set1.remove(4)	# {1, 2, 3, 6}
+# 集合的交集、并集、差集、对称差运算
+print(set1, set2)	# {1, 2, 3, 6} {1, 2, 3, 4, 5, 6, 7, 8, 9}
+print(set1 & set2)	# {1, 2, 3, 6}  <==> print(set1.intersection(set2))
+print(set1 | set2)	# {1, 2, 3, 4, 5, 6, 7, 8, 9}  <==> print(set1.union(set2)) 
+print(set1 - set2)	# set()	<==> print(set1.difference(set2))
+print(set1 ^ set2)	# {4, 5, 7, 8, 9} <==> print(set1.symmetric_difference(set2))
+# 判断子集和超集
+print(set1 >= set2)	# False <==> print(set1.issuperset(set2))
+print(set1 <= set2)	# True 	<==> print(set1.issubset(set2))
+```
+
+#### 字典
+
+字典是另一种可变容器模型，Python中的字典跟我们生活中使用的字典是一样一样的，它可以存储任意类型对象，与列表、集合不同的是，字典的每个元素都是由一个键和一个值组成的“键值对”，键和值通过冒号分开。
+
+```python
+# 创建字典的字面量语法
+scores = {'骆昊': 95, '白元芳': 78, '狄仁杰': 82}	# {'骆昊': 95, '白元芳': 78, '狄仁杰': 82}
+# 创建字典的构造器语法
+items1 = dict(one=1, two=2, three=3, four=4)	# {'one': 1, 'two': 2, 'three': 3, 'four': 4}
+# 通过zip函数将两个序列压成字典
+items2 = dict(zip(['a', 'b', 'c'], '123'))	# {'a': '1', 'b': '2', 'c': '3'}
+# 创建字典的推导式语法
+items3 = {num: num ** 2 for num in range(1, 5)}	# {1: 1, 2: 4, 3: 9, 4: 16}
+# 通过键可以获取字典中对应的值
+print(scores['骆昊'])	# 95
+if '狄仁杰' in scores:
+    print(scores['狄仁杰'])
+print(scores.get('狄仁杰'))
+# get方法也是通过键获取对应的值但是可以设置默认值
+print(scores.get('武则天', 60))
+# 对字典中所有键值对进行遍历
+for key in scores:
+    print(f'{key}: {scores[key]}')
+# 更新字典中的元素
+scores['白元芳'] = 65
+scores['诸葛王朗'] = 71
+scores.update(冷面=67, 方启鹤=85)
+# 删除字典中的元素
+print(scores.popitem())
+print(scores.pop('骆昊', 100))
+# 清空字典
+scores.clear()
+```
+
+#### 练习题
+
+##### 在屏幕上显示跑马灯文字
+
+```python
+import os
+import time
+
+def main():
+    content = '北京欢迎你为你开天辟地…………'
+    while True:
+        # 清理屏幕上的输出
+        os.system('clear')
+        print(content)
+        # 休眠200毫秒
+        time.sleep(0.2)
+        content = content[1:] + content[0]
+
+if __name__ == '__main__':
+    main()
+```
+
+##### 设计一个函数产生指定长度的验证码，验证码由大小写字母和数字构成
+
+```python
+import random
+
+def generate_code(code_len=4):
+    """
+    生成指定长度的验证码
+
+    :param code_len: 验证码的长度(默认4个字符)
+
+    :return: 由大小写英文字母和数字构成的随机验证码
+    """
+    all_chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    last_pos = len(all_chars) - 1
+    code = ''
+    for _ in range(code_len):
+        index = random.randint(0, last_pos)
+        code += all_chars[index]
+    return code
+```
+
+##### 设计一个函数返回给定文件名的后缀名
+
+```python
+def get_suffix(filename, has_dot=False):
+    """
+    获取文件名的后缀名
+
+    :param filename: 文件名
+    :param has_dot: 返回的后缀名是否需要带点
+    :return: 文件的后缀名
+    """
+    pos = filename.rfind('.')
+    if 0 < pos < len(filename) - 1:
+        index = pos if has_dot else pos + 1
+        return filename[index:]
+    else:
+        return ''
+```
+
+##### 设计一个函数返回传入的列表中最大和第二大的元素的值
+
+
+
+>>>>>>> 0bb285fb7414cc8c1033b0774d4e25316ac3f6ec

@@ -58,10 +58,18 @@ Python的缺点主要集中在以下几点。
 1）**IPython - 交互式编程工具**
 
 ```shell
+# 安装 python3.6
+yum install -y python36
+# 安装 pip3
+yum install -y python36-setuptools
+yum install -y python36-pip
 ## pip 安装
 pip install ipython
 ## pip3 安装
 pip3 install ipython
+## 软连接
+find / -name ipython3
+ln -s /usr/local/bin/ipython3  /usr/bin/ipython3
 ## 启动 IPython
 ipython
 ```
