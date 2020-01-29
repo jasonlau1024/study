@@ -231,13 +231,6 @@ list1.pop(0)	==> [400, 5, 7, 100, 200, 1000, 2000]
 
 ***知识点：***
 
-<<<<<<< HEAD
-1. `len()`获取列表长度
-
-2. `range()`：创建一个整数列表，一般用在 for 循环中。
-
-   `range(start, stop[, step])`
-=======
 - `len()`：返回对象（字符、列表、元组等）长度
 
   `len(str)`
@@ -541,6 +534,64 @@ def get_suffix(filename, has_dot=False):
 
 ##### 设计一个函数返回传入的列表中最大和第二大的元素的值
 
+```python
+def max2(x):
+    m1, m2 = (x[0], x[1]) if x[0] > x[1] else (x[1], x[0])
+    for index in range(2, len(x)):
+        if x[index] > m1:
+            m2 = m1
+            m1 = x[index]
+        elif x[index] > m2:
+            m2 = x[index]
+    return m1, m2
+```
+
+##### 双色球选号
+
+```python
+from random import randrange, randint, sample
+"""
+使用random模块的sample函数来实现从列表中选择不重复的n个元素。
+"""
+def display(balls):
+    """
+    输出列表中的双色球号码。
+    """
+    for index, ball in enumerate(balls):
+        if index == len(balls) - 1:
+            print('|', end=' ')
+        print('%02d' % ball, end=' ')
+    print()
+
+def random_select():
+    """
+    随机选择一组号码
+    """
+    red_balls = [x for x in range(1, 34)]
+    selected_balls = []
+    selected_balls = sample(red_balls, 6)
+    selected_balls.sort()
+    selected_balls.append(randint(1, 16))
+    return selected_balls
+
+def main():
+    n = int(input('机选几注: '))
+    for _ in range(n):
+        display(random_select())
+
+if __name__ == '__main__':
+    main()
+"""
+输出结果：
+机选几注: 2
+06 07 09 25 26 32 | 09 
+06 11 18 25 30 32 | 08 
+"""
+```
 
 
->>>>>>> 0bb285fb7414cc8c1033b0774d4e25316ac3f6ec
+
+## 面向对象编程
+
+
+
