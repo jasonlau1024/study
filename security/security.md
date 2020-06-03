@@ -133,3 +133,12 @@ Shellcode，简单翻译“shell 代码”，是 Payload 的一种，由于其�
 include文件包含：
 
 `<script language="php">include '../ezfiles/2/1002/img/92/123.jpg';//上传的图片地址</script>`
+
+
+
+
+
+# DDOS
+
+<https://github.com/OffensivePython/Saddam>
+
