@@ -1,5 +1,114 @@
 [DevOps]
 
+
+
+# Docker
+
+
+
+
+
+# K8S
+
+
+
+
+
+## 部署实践
+
+### 使用kebeadm快速部署一个K8s集群
+
+#### 概述
+
+kubeadm是官方社区推出的一个用于快速部署kubernetes集群的工具。
+
+这个工具能通过两条指令完成一个kubernetes集群的部署：
+
+- 创建一个 Master 节点：`kubeadm init`
+- 将一个 Node 节点加入当前集群：`kubeadm join <Master 节点的 IP 和端口>`
+
+#### 部署环境
+
+
+
+**架构图：**
+
+![kubernetesæ¶æå¾](https://blog-1252881505.cos.ap-beijing.myqcloud.com/k8s/single-master.jpg)
+
+
+
+**集群服务列表：**
+
+| 角色         | IP             | 安装组件                               |
+| ------------ | -------------- | -------------------------------------- |
+| k8s-master01 | 172.31.215.246 | apiserver/controller-manager/scheduler |
+| k8s-node01   | 172.31.215.248 | kubeadm/kubelet/docker + etcd          |
+| k8s-node02   | 172.31.215.241 | kubeadm/kubelet/docker + etcd          |
+| k8s-node03   | 172.31.215.240 | kubeadm/kubelet/docker + etcd          |
+
+**部署步骤：**
+
+1. `work`节点安装`Docker/kubeadm/kubelet`（Kubernetes默认CRI（容器运行时）为Docker，因此先安装Docker）
+
+
+
+**主机环境：**
+
+```shell
+关闭防火墙：
+$ systemctl stop firewalld
+$ systemctl disable firewalld
+
+关闭selinux：
+$ sed -i 's/enforcing/disabled/' /etc/selinux/config  # 永久
+$ setenforce 0  # 临时
+
+关闭swap：
+$ swapoff -a  # 临时
+$ vim /etc/fstab  # 永久
+
+设置主机名：
+$ hostnamectl set-hostname <hostname>
+
+在master添加hosts：
+$ cat >> /etc/hosts << EOF
+172.31.215.246	k8s-master01
+172.31.215.248	k8s-node01
+172.31.215.241	k8s-node02
+172.31.215.240	k8s-node03
+EOF
+
+将桥接的IPv4流量传递到iptables的链：
+$ cat > /etc/sysctl.d/k8s.conf << EOF
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+$ sysctl --system  # 生效
+
+时间同步：
+$ yum install ntpdate -y
+$ ntpdate time.windows.com
+
+添加阿里云YUM软件源：
+$ cat > /etc/yum.repos.d/kubernetes.repo << EOF
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
+gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+EOF
+```
+
+
+
+
+
+
+
+
+
 # Prometheus
 
 > 相关查看文档：
