@@ -135,6 +135,15 @@ cat /var/lib/logrotate/logrotate.status
 # 应用场景
 ## System
 
+### Yum 源
+#### EPEL源
+EPEL 即Extra Packages for Enterprise Linux的简称，是为企业级Linux提供的一组高质量的额外软件包，包括但不限于Red Hat Enterprise Linux (RHEL), CentOS and Scientific Linux (SL), Oracle Enterprise Linux (OEL)。
+EPEL官网:http://fedoraproject.org/wiki/EPEL/zh-cn
+
+**Centos7安装EPEL：**`yum -y install epel-release`
+**重新创建 本地仓库缓存：**`yum clean all && yum makecache`
+
+
 ### LVM
 #### 概念
 LVM主要在磁盘与文件系统之间建立一个层,主要用来管理多磁盘多分区，及与多文件系统的映射。
@@ -248,4 +257,104 @@ lvdisplay
 
 
 
+## Centos8 VS Centos7 (参照redhat)
+> 红帽RHEL8与RHEL7的区别
+镜像下载地址：
+- 官网默认下载：https://wiki.centos.org/Download
+- 官网之前版本：https://www.centos.org/download/
+- 阿里云镜像：http://mirrors.aliyun.com/centos
+
+
+
+
+### 红帽RHEL8和RHEL7功能区别对比
+1.1 默认的文件系统
+RHEL8与RHEL7都是采用XFS
+1.2 
+
+
+### Centos8 网络配置
+1）RHEL8与RHEL7的区别：
+RHEL7：同时支持`network.service`和`NetworkManager.service（NM）`。默认情况下，这2个服务都有开启，但通常会将NM禁用掉。
+RHEL8：废弃`network.service`，因此只能通过NM进行网络配置，包括动态ip和静态ip，即必须开启NM，否则无法使用网络。
+*注：*rhel8依然支持`network.service`，只是默认没安装。可以通过`yum install network-script`s来安装传统的network.service，但下一个rhel的大版本里将彻底废除，因此不建议使用network.service。
+
+#### 网络配置的3种方式
+`ifcfg`和`NM connection`的关联：虽然`network.service`被废弃了，但是redhat 8 为了兼容传统的ifcfg，通过NM进行网络配置时候，会自动将connection同步到ifcfg配置文件中。也可以通过`nmcli c reload`或者`nmcli c load /etc/sysconfig/network-scripts/ifcfg-ethX`的方式来让NM读取ifcfg配置文件到connection中。因此ifcfg和connection是一对一的关系，connection和device是多对一的关系。
+第一种.手工配置ifcfg，通过NM来生效（推荐）
+```shell
+cat > /etc/sysconfig/network-scripts/ifcfg-eth0 <<EOF
+NAME=eth0
+DEVICE=eth0
+ONBOOT=yes
+BOOTPROTO=none
+TYPE=Ethernet
+IPADDR=192.168.1.10
+NETMASK=255.255.255.0
+GATEWAY=192.168.1.1
+EOF
+nmcli c reload
+或 nmcli c up eth0
+```
+
+第二种.通过NM自带工具配ip，比如nmcli。
+
+第三种.手工配置ifcfg，通过传统network.service来生效。
+
+
+#### nmcli
+**基本概念：**
+- nmcli connection 可理解为配置文件，相当于ifcfg-ethX
+  connection有2种状态：
+  - 活跃：表示当前该connection生效。
+  - 非活跃：表示当前该connection不生效。
+- nmcli device 可理解为实际存在的网卡（包括物理网卡和虚拟网卡），可以简写为nmcli d
+  device有4种常见状态：
+  - connected：已被NM纳管，并且当前有活跃的connection。
+  - disconnected：已被NM纳管，但是当前没有活跃的connection。
+  - unmanaged：未被NM纳管。
+  - unavailable：不可用，NM无法纳管，通常出现于网卡link为down的时候（比如ip link set ethX down）。
+
+**常用命令：**
+IP配置：
+- 配置静态IP：`nmcli c add type ethernet con-name ethX ifname ethX ipv4.addr 192.168.1.100/24 ipv4.gateway 192.168.1.1 ipv4.method manual`
+- 配置动态IP：`nmcli c add type ethernet con-name ethX ifname ethX ipv4.method auto`
+- 修改IP(非交互式)：`nmcli c modify ethX ipv4.addr '192.168.1.200/24'`
+- 修改IP(交互式)：`nmcli c edit ethX` --> `goto ipv4.addresses` --> `change`
+
+nmcli connection 指令：
+```shell
+nmcli c up ethX   # 启用connection（相当于ifup）
+nmcli c down      # 停止connection（相当于ifdown）
+nmcli c delete ethX   # 删除connection（类似于ifdown并删除ifcfg）
+nmcli c show      # 查看connection列表
+nmcli c show ethX # 查看connection详细信息
+
+## 重载ifcfg或route到connection（不会立即生效）
+nmcli c reload
+nmcli c load /etc/sysconfig/network-scripts/ifcfg-ethX
+nmcli c load /etc/sysconfig/network-scripts/route-ethX
+## 立即生效connection，有3种方法
+nmcli c up ethX
+nmcli d reapply ethX
+nmcli d connect ethX
+```
+nmcli device 指令：
+```shell
+nmcli d           # 查看device列表
+nmcli d show      # 查看所有device详细信息
+nmcli d show ethX # 查看指定device的详细信息
+nmcli d connect ethX  # 激活网卡
+nmcli d disconnect ethX  # 让 NM 暂时不管理指定网卡
+```
+
+#### arp-scan
+arp-scan 用于arp批量扫描. 运维最常见的需求就是分配新ip,确认这个ip有没有被使用.即使有ip表和系统查询,你也不能保证数据的准确性.大部分人会用ping,但是禁ping的服务器再正常不过了. 这个时候就要用到nmap和arp-scan了. 这两个工具安装在同一个子网的服务器内.nmap 用于端口扫描, 可以批量扫描.  arp-scan用于mac地址扫描,可以批量扫描.
+
+centos7安装：
+```shell
+yum -y install epel-release
+yum install arp-scan -y
+arp-scan -I ens33 -l
+```
 
