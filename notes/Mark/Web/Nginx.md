@@ -352,6 +352,24 @@ curl localhost/status?format=jason
 ```
 
 
+#### 隐藏Server及版本信息
+
+隐藏版本信息：`server_tokens off;`
+
+隐藏Server信息(Header)
+```SHELL
+## 需重新编译Nginx
+## 编辑 src/http/ngx_http_header_filter_module.c
+将
+static char ngx_http_server_string[] = "Server: nginx" CRLF;
+static char ngx_http_server_full_string[] = "Server: " NGINX_VER CRLF;
+改为
+static char ngx_http_server_string[] = "Server: X-Web" CRLF;
+static char ngx_http_server_full_string[] = "Server:X-Web " CRLF;
+
+## 重新编译，浏览器访查看 Header 信息，变成 Server：X-Web
+```
+
 
 
 

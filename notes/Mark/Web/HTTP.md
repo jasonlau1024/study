@@ -89,4 +89,98 @@ URL,Uniform Resource Locator，统一资源定位符
 URN,统一资源名称
 
 ### HTTPS
-HTTP是明文传输的，容易被窃取信息，HTTPS是在HTTP的基础上
+HTTP是明文传输的，容易被窃取信息，HTTPS是在HTTP的基础上增加了SSL层。
+
+## HTTP请求
+### HTTP请求响应过程
+简单说明：
+1. DNS服务器域名解析到服务器地址。
+2. 客户端向服务器发起一个TCP连接。
+3. 客户端向服务器发送HTTP请求报文。
+4. 服务器封装请求资源到HTTP响应报文并发送通知TCP断开连接。
+5. 客户端接收响应报文，关闭TCP连接。
+
+### HTTP请求特征
+- C/S模式
+- 简单快速：客户端向服务器请求服务时，只需传送请求方法和路径。
+- 灵活：HTTP允许传输任意类型的数据对象，由Content-Type标记。
+- 无连接：每次连接只处理一个请求。节省传输时间。
+- 无状态：HTTP协议是无状态协议。
+
+
+
+## 详解HTTP报文
+HTTP协议组成：
+- Header(头部/请求头/响应头)
+  - 起始行(Start Line)：描述请求或响应的基本信息。
+    `GET /test.html HTTP/1.1  # 请求方法 URL 版本号`
+  - 头部字段(Header)：使用 Key-Vaule 形式更详细地说明报文。
+
+
+- body(实体)：实际传输的数据。
+  - 消息正文(Entity)
+
+### HTTP请求方法
+
+最常用的是GET和POST方法，其它了解即可。
+
+| 方法    | 说明                   | 指的的HTTP版本 |
+| ------- | ---------------------- | -------------- |
+| GET     | 获取资源               | 1.0/1.1        |
+| POST    | 传输实体实体           | 1.0/1.1        |
+| PUT     | 传输文件               | 1.0/1.1        |
+| HEAD    | 获得报文首部           | 1.0/1.1        |
+| DELETE  | 删除文件               | 1.0/1.1        |
+| OPTIONS | 询问支持的方法         | 1.1            |
+| TRACE   | 追踪路径               | 1.1            |
+| CONNECT | 要求用隧道协议连接代理 | 1.1            |
+| LINK    | 建立和资源之间的联系   | 1.0            |
+| UNLINE  | 断开连接关系           | 1.0            |
+
+
+### HTTP请求URL
+示例：`http://www.example.com:80/path/to/myfile.html?key1=value1&key2=value2#SomewhereInTheDocument`
+- `http://` 指定Protocol(协议) http
+- `www.example.com` 主机
+- `:80` 端口
+- `/path/to/myfile.html` 路径（Path to file）
+- `?key1=value1&key2=value2` 查询参数
+- `#SomewhereInTheDocument` 片段标识，锚点，代表资源内的一种"标签"
+
+### HTTP 版本说明
+**HTTP 1.0:**（1996）
+
+- 提供最基本的认证（用户名密码未经加密）。
+- 短连接，每次发送数据都需TCP的三次握手和四次挥手。
+- 只使用Header中的 `if-Modified-Since`和`Expires`作为缓存失效的标准。
+- 不支持断点续传，每次都需传送全部的页面和数据。
+- 默认每台计算机智能绑定一个IP，请求没有传递Hostname。
+
+**HTTP 1.1:**（1999）
+- 使用摘要算法来进行身份验证。
+- 默认使用长连接，一次建立连接可以传输多次数据，连接时长可通过请求头的`keep-alive`设置。
+- 新增加了`E-tag,If-Unmodified-Since,If-Match,If-None-Match`等缓存控制标头来控制缓存失效。
+- 支持断点续传，通过使用请求头中的`Range`来实现。
+- 使用了虚拟网络，一个IP可对应多个虚拟主机(Multi-homed Web Servers)。
+
+**HTTP 2.0:**（2015）
+- 头部压缩，HTTP1.x的header带有大量信息，而且每次都要重复发送，HTTP2.0使用encoder来减少需要传输的header大小，通讯双方各自cache一份header fields表，既避免了重复header的传输，又减小了需要传输的大小。
+- 二进制格式，使用更加靠近 TCP/IP 的二进制格式，抛弃ASCII码，提高解析效率。
+- 强化安全，HTTP2 一般运行在HTTPS上
+- 多路复用，连接共享，一个连接可并发处理多个请求。
+
+## HTTP 标头
+HTTP 1.1 的标头主要分为四种，**通用标头**，**实体标头**，**请求标头**，**响应标头**
+### 通用标头
+
+- Cache-Control(Cache-Control: vaule)
+  管理 HTTP 请求/响应 如何使用缓存。
+  - `no-cache`：每个请求都经缓存服务器到达服务器，如果有新资源从服务器返回，没有则从缓存服务器返回。
+  - `no-store`：真正意义上的不缓存，返回服务器最新的资源。
+
+### 请求标头
+
+### 响应标头
+
+
+### 实体标头

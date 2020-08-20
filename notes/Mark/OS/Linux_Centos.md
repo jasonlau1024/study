@@ -358,3 +358,14 @@ yum install arp-scan -y
 arp-scan -I ens33 -l
 ```
 
+#### Linux使用技巧
+##### 限制用户使用chmod命令
+
+1）修改用户对应HOME目录下的`~/.bashrc`文件
+```shell
+# 添加
+alias chmod='echo "do not use chmod command"'
+alias chown='echo "do not use chmod command"'
+```
+2）禁止用户修改文件
+`chattr +i /home/username/.bashrc`

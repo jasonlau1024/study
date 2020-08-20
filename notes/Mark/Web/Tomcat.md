@@ -224,3 +224,96 @@ conf/web.xml在倒数第1行之前加如下内容：
 
 
 
+
+## 故障处理
+中心思想：
+- 尽快恢复服务，消除影响。
+- 保留部分现场，再去定位问题、解决问题和复盘。
+  （内存dump、线程dump、gc log等等）
+![img](http://ww1.sinaimg.cn/large/005XyHIDly1ge88vduwvlj31260emq4t.jpg)
+
+
+### 常见问题排查思路
+
+#### CPU 利用率高/飙升
+
+线上常见问题排查手册：<https://developer.aliyun.com/article/757655>
+Java 应用线上问题排查思路、常用工具小结：<https://ricstudio.top/archives/java-online-question-probe>
+
+常见原因：
+- 频繁 GC
+- 死循环、线程阻塞、io wait...
+
+1）定位出问题的线程
+方法1.传统方法
+1. `top`定位CPU最高的进程
+2. `top -Hp pid`定位改进程CPU最高的线程
+3. `printf '0x%x' tid`线程ID转化为16进制
+4. `jstack pid | grep tid -A 30` 找到线程堆栈
+
+方法2.show-busy-java-threads
+该脚本来自于github上一个开源项目，项目提供了很多有用的脚本，show-busy-java-threads就是其中的一个。使用这个脚本，可以直接简化方法1中的繁琐步骤。
+```shell
+wget --no-check-certificate https://raw.github.com/oldratlee/useful-scripts/release-2.x/bin/show-busy-java-threads
+chmod +x show-busy-java-threads
+./show-busy-java-threads
+
+# 从所有运行的Java进程中找出最消耗CPU的线程（缺省5个），打印出其线程栈
+# 缺省会自动从所有的Java进程中找出最消耗CPU的线程，这样用更方便
+# 当然你可以手动指定要分析的Java进程Id，以保证只会显示你关心的那个Java进程的信息
+
+show-busy-java-threads -p <指定的Java进程Id>
+show-busy-java-threads -c <要显示的线程栈数>
+```
+方法3.arthas thread
+Arthas 是由阿里巴巴开源的Java诊断工具。
+https://github.com/alibaba/arthas
+教程：https://arthas.aliyun.com/doc
+
+```shell
+curl -O https://arthas.aliyun.com/arthas-boot.jar
+java -jar arthas-boot.jar
+$ thead -n ID
+```
+
+
+#### 频繁 GC
+GC 流程图：
+![img](http://ww1.sinaimg.cn/large/005XyHIDly1g9v43r4weaj30wa0siq93.jpg)
+
+方法a : 查看gc 日志
+方法b : jstat -gcutil 进程号 统计间隔毫秒 统计次数（缺省代表一致统计
+方法c : 如果所在公司有对应用进行监控的组件当然更方便（比如Prometheus + Grafana）
+
+开启 GC 日志：
+- JDK自带的jinfo工具
+- arthas的vmoption
+- 启动时指定参数
+
+获取到gc日志之后，可以上传到GC easy<https://gceasy.io/>帮助分析，得到可视化的图表分析结果.
+
+GC 可能原因：
+- survivor 区太小，对象过早进入老年代
+  查看 SurvivorRatio 参数
+- 大对象分配，没有足够的内存
+  dump 堆，profiler/MAT 分析对象占用情况
+- old 区存在大量对象
+  dump 堆，profiler/MAT 分析对象占用情况
+
+可以从full GC 的效果来推断问题，正常情况下，一次full GC应该会回收大量内存，所以 正常的堆内存曲线应该是呈锯齿形。如果你发现full gc 之后堆内存几乎没有下降，那么可以推断： 堆中有大量不能回收的对象且在不停膨胀，使堆的使用占比超过full GC的触发阈值，但又回收不掉，导致full GC一直执行。换句话来说，可能是内存泄露了。
+
+一般GC相关的异常推断都需要涉及到内存分析，使用jmap之类的工具dump出内存快照（或者 Arthas的heapdump）命令，然后使用MAT、JProfiler、JVisualVM等可视化内存分析工具。
+
+#### 线程池异常
+
+**异常说明：**
+Java 线程池以有界队列的线程池为例，当新任务提交时，如果运行的线程少于 corePoolSize，则创建新线程来处理请求。如果正在运行的线程数等于 corePoolSize 时，则新任务被添加到队列中，直到队列满。当队列满了后，会继续开辟新线程来处理任务，但不超过 maximumPoolSize。当任务队列满了并且已开辟了最大线程数，此时又来了新任务，ThreadPoolExecutor 会拒绝服务。
+
+**常见问题和原因：**
+1. 下游服务 响应时间（RT）过长
+2. 数据库慢 sql 或者数据库死锁
+3. Java 代码死锁
+   `jstack –l pid | grep -i –E 'BLOCKED | deadlock'`
+
+
+

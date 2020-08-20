@@ -466,3 +466,270 @@ nginx-deployment-d4544f9cb-vk5dl   1/1     Running   0          19s     10.244.2
 #### 用label控制Pod的位置
 *说明：*默认配置下，Scheduler会将Pod调度到所有可用的Node。不过有 些情况我们希望将Pod部署到指定的Node，比如将有大量磁盘I/O的 Pod部署到配置了SSD的Node；或者Pod需要GPU，需要运行在配置 了GPU的节点上。
 
+1) 打标签
+```shell
+kubectl label node k8snode02 --show-labels
+kubectl label node k8snode02 disktype=ssd
+kubectl label node k8snode02 --show-labels
+```
+2）修改YAML文件
+
+在Pod模板的`spec`里通过`nodeSelector`指定将此Pod部署到具有label disktype=ssd的Node上。
+```SHELL
+... ...
+spec:
+  ... ...
+  nodeSelector:
+    disktype: ssd
+$ kubectl apply -f nginx.yaml
+$ kubectl get pods -o wide
+# 可以看到 nginx 的 pod 都运行在k8snode02
+```
+
+3）删除标签
+`kubectl label node k8snode02 disktype-`
+
+
+### DaemonSet
+Deployment部署的副本Pod会分布在各个Node上，每个Node都可 能运行好几个副本。DaemonSet的不同之处在于：每个Node上最多只 能运行一个副本。
+
+**典型应用场景：**
+- 在集群的每个节点上运行存储Daemon。如：glusterd或ceph
+- 在每个节点上运行日志收集Daemon。如：flunentd或 logstash。
+- 在每个节点上运行监控Daemon。如：Prometheus Node Exporter或collectd
+
+k8s使用DaemonSet运行系统组件
+```SHELL
+$ kubectl get daemonset --namespace=kube-system
+NAME                      DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+kube-flannel-ds-amd64     3         3         3       3            3           <none>                   7d23h
+kube-flannel-ds-arm       0         0         0       0            0           <none>                   7d23h
+kube-flannel-ds-arm64     0         0         0       0            0           <none>                   7d23h
+kube-flannel-ds-ppc64le   0         0         0       0            0           <none>                   7d23h
+kube-flannel-ds-s390x     0         0         0       0            0           <none>                   7d23h
+kube-proxy                3         3         3       3            3           kubernetes.io/os=linux   8d
+## DaemonSet kube-flannel-ds和kube-proxy分别负责在每个节点上运 行flannel和kube-proxy组件。
+```
+#### DaemonSet:kube-proxy
+```shell
+$ kubectl edit daemonset kube-proxy --namespace=kube-system
+apiVersion: apps/v1
+kind: DaemonSet # 指定这是一个DaemonSet类型的资源
+... ...
+      containers: # kube-proxy的容器定义
+      - command:
+        - /usr/local/bin/kube-proxy
+        - --config=/var/lib/kube-proxy/config.conf
+        - --hostname-override=$(NODE_NAME)
+... ...
+status: # 当前DaemonSet的运行时状态
+  currentNumberScheduled: 3
+  desiredNumberScheduled: 3
+  numberAvailable: 3
+  numberMisscheduled: 0
+  numberReady: 3
+  observedGeneration: 1
+  updatedNumberScheduled: 3
+```
+#### 运行自己的DaemonSet
+以 Prometheus Node Exporter 示例：Node Exporter是Prometheus 的agent，以Daemon的形式运行在每个被监控节点上。
+```shell
+cat node-exporter.yaml
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: kube-system
+  labels:
+    k8s-app: node-exporter
+spec:
+  template:
+    metadata:
+      labels:
+        k8s-app: node-exporter
+    spec:
+      containers:
+      - image: prom/node-exporter
+        name: node-exporter
+        ports:
+        - containerPort: 9100
+          protocol: TCP
+          name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-app: node-exporter
+  name: node-exporter
+  namespace: kube-system
+spec:
+  ports:
+  - name: http
+    port: 9100
+    nodePort: 31672
+    protocol: TCP
+  type: NodePort
+  selector:
+    k8s-app: node-exporter
+
+```
+
+
+
+
+# 应用实例
+## Prometheus 监控系统
+
+### Prometheus简介
+Prometheus是一套开源的系统监控报警框架。2016年，Prometheus正式加入CNCF（Cloud Native Computing Foundation），是仅次于Kubernetes的第二个项目，目前已经全面接管了 Kubernetes项目的整套监控体系。
+
+Prometheus的监控是基于时序数据的，即通过采样数据(metrics)，不断获取监控目标的状态信息，即时地记录与展示，并根据设定的门限和方式及时发布告警。
+
+作为应用与Kubernetes的监控体系，Prometheus具备诸多的优势，如：
+- Kubernetes默认支持,非常适合容器和微服务
+- 无依赖，安装方便，上手容易
+- 社区活跃，它不仅仅是个工具，而是生态
+- 已有很多插件或者exporter，可以适应多种应用场景的数据收集需要
+- Grafana默认支持,提供良好的可视化
+- 高效，单一Prometheus可以处理百万级的监控指标，每秒处理数十万的数据点
+而当前Prometheus最大的缺点就是暂时还不支持集群化。
+
+**基本架构图：**
+![img](https://www.kubernetes.org.cn/img/2020/03/1.png)
+
+**相关组件：**
+- `Prometheus Server`：是Prometheus架构中的核心部分，负责实现对监控数据的获取、存储及查询。Prometheus Server可以通过静态配置管理监控目标，也可以配合使用Service Discovery的方式动态管理监控目标，并从这些监控目标中获取数据。其次Prometheus Server本身也是一个时序数据库，将采集到的监控数据按照时间序列的方式存储在本地磁盘当中。Prometheus Server对外提供了自定义的PromQL，实现对数据的查询以及分析。
+- `Exporter`：是提供监控数据的来源。Exporter分为两类：一类Exporter直接内置了对Prometheus监控的支持，如Kubernetes、etcd等；另一类是因为原有监控目标并不直接支持Prometheus，需要通过Prometheus提供的Client Library编写该监控目标的监控采集程序，如Mysql、JMX等。对于Exporter，Prometheus Server采用pull的方式来采集数据。
+- `PushGateway`：同样是监控数据的来源。对于由于特定原因，如网络环境不允许等，Prometheus Server不能直接与Exporter进行通信时，可以使用PushGateway来进行中转。内部网络的监控数据主动Push到Gateway中，而和对Exporter一样，Prometheus Server也利用pull的方式从PushGateway采集数据。
+- `Alertmanager`：是Prometheus体系中的告警组件。在Prometheus Server中可以设定门限与警报规则。当采集到的数据满足相关规则后，就会产生一条告警。Alertmanager从 Prometheus Server接收到告警后，会根据事先设定的路径，向外发出告警。常见的告警发送路径有：电子邮件、PagerDuty、Webhook、Slack等。
+- 数据展示与输出：Prometheus Server有内置的UI用于展示采集到的监控数据。在该UI上，可以通过各种内置的数学公式对原始数据进行加工，并通过图形化的方式展现出来。当然，Prometheus Server原生UI的展示方式还是比较基础和单薄，所以目前更多的是通过对接Grafana来进行数据的展示，可以得到更好的展示效果。此外，Prometheus Server也提供API的方式来实现对监控数据的访问。
+
+
+### prometheus-operator与kube-prometheus
+
+在最新版本中，kubernetes的prometheus-operator部署内容已经从prometheus-operator的github工程中拆分出独立工程kube-prometheus。
+
+kube-prometheus即是通过operator方式部署的kubernetes集群监控，所以我们直接容器化部署kube-prometheus即可。
+
+kube-prometheus Github地址：https://github.com/coreos/kube-prometheus/releases
+
+
+## Prometheus 持久化安装
+
+参考资料：
+kubernetes1.18安装kube-prometheus<https://blog.csdn.net/guoxiaobo2010/article/details/106532357>
+grafana&prometheus生产级容器化监控(重点)<https://cloud.tencent.com/developer/article/1559844>
+
+阿里云OSS作为k8s存储(pv/pvc)实践<https://blog.csdn.net/weixin_40449300/article/details/106938845>
+
+
+镜像下载失败：`docker pull quay.mirrors.ustc.edu.cn/coreos/kube-rbac-proxy:v0.4.1`
+从其它机器获取镜像包：`docker save quay.io/coreos/kube-rbac-proxy:v0.4.1 -o /opt/kube-rbac-proxy.tar`
+加载到服务器镜像仓库：`docker load -i kube-rbac-proxy.tar`
+*注：*镜像名时候与YAML配置文件定义的镜像保持一致，`docker tag IMAGEID(镜像id) REPOSITORY:TAG`
+
+
+
+
+
+
+
+
+查看Pod运行信息：
+```shell
+$ kubectl get pod -n monitoring -o wide
+NAME                                   READY   STATUS    RESTARTS   AGE     IP              NODE
+alertmanager-main-0                    2/2     Running   0          33m     10.244.2.22     k8snode02
+alertmanager-main-1                    2/2     Running   0          33m     10.244.1.24     k8snode01
+alertmanager-main-2                    2/2     Running   0          33m     10.244.0.5      k8smaster01
+grafana-67dfc5f687-bpsvn               1/1     Running   0          33m     10.244.2.23     k8snode02
+kube-state-metrics-c7f9bdccb-72ccc     3/3     Running   0          33m     10.244.2.24     k8snode02
+node-exporter-22584                    2/2     Running   0          33m     192.168.36.50   k8smaster01
+node-exporter-9xtml                    2/2     Running   0          33m     192.168.36.51   k8snode01
+node-exporter-l25qq                    2/2     Running   0          33m     192.168.36.52   k8snode02
+prometheus-adapter-66b855f564-rfcqd    1/1     Running   0          33m     10.244.1.25     k8snode01
+prometheus-k8s-0                       3/3     Running   1          33m     10.244.2.25     k8snode02
+prometheus-k8s-1                       3/3     Running   3          33m     10.244.1.26     k8snode01
+prometheus-operator-7bf55877f5-2svm9   2/2     Running   0          3h20m   10.244.1.23     k8snode01
+```
+
+kube-prometheus主要组件概述
+
+| 组件                | 个数 | 原生 | 作用                                                         |
+| ------------------- | ---- | ---- | ------------------------------------------------------------ |
+| alertmanager-main   | 3    | 是   | 提供报警插件的支持，可集成钉钉、微信等报警插件               |
+| grafana             | 1    | 是   | 提供可视化Web界面                                            |
+| kube-state-metrics  | 1    | 是   | 监听Kubernetes API服务器获取对象状态度量。Grafana和prometheus的数据来源 |
+| prometheus-adapter  | 1    | 是   | prometheus属于第三方解决方案，原生的k8s系统并不能对Prometheus的自定义指标进行解析，需要借助于k8s-prometheus-adapter将这些指标数据查询接口转换为标准的Kubernetes自定义指标。 |
+| prometheus-k8s      | 2    | 是   | prometheus,存放集群度量数据。                                |
+| prometheus-operator | 1    | 是   | Operator 是最核心的部分，作为一个控制器，他会去创建 Prometheus 、 ServiceMonitor 、 AlertManager 以及 PrometheusRule 4个 CRD 资源对象，然后会一直监控并维持这4个资源对象的状态。可以这样类比理解,相当于statefulset/deployment与POD的关系。 |
+| webhook-dingtalk    | 1    | 否   | 集成钉钉报警机器人                                           |
+
+
+
+
+### 创建命令空间
+为管理需要，所有Prometheus组件都应运行在一个独立的命名空间当中。因此安装的第一步，就是要创建一个新的Namespace，此处为“monitoring”。
+```shell
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+```
+### 部署node-exporter
+node-exporter是以DaemonSet对象的方式进行部署的，可以确保每个Kubernetes Node的数据都会被采集到Prometheus。
+```YAML
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: prometheus-node-exporter
+  namespace: monitoring
+    - image: prom/node-exporter:v1.0.1
+      name: prometheus-node-exporter
+        containerPort: 9100
+        hostPort: 9100
+    hostNetwork: true
+```
+*注：*`node-exporter`开放了hostPort：9100，所以可以通过直接访问<Node_IP>:9100来访问`node-exporter`采集到的数据。
+除DaemonSet外，还需要部署对应的Service，供Prometheus Server对接使用。需要注意的是，该Service只开放了Cluster内部端口，不能直接从外部访问。
+```YAML
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: 'true'
+  name: prometheus-node-exporter
+  namespace: monitoring
+```
+### 部署kube-state-metrics
+除了node-exporter，还可以部署另一个数据来源，kube-state-metrics。kube-state-metrics关注于获取kubernetes各种资源的最新状态，如deployment或者daemonset等。kube-state-metrics轮询Kubernetes API，并将Kubernetes的结构化信息转换为metrics，将kubernetes的运行状况在内存中做个快照。
+*说明：*因为kube-state-metrics要访问API，所以要先创建ServiceAccount来提供权限。之后再部署相应的Deployment:
+```YAML
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+spec:
+  replicas: 1
+    containers:
+    - name: kube-state-metrics
+      image: gcr.io/goole_containers/kube-state-metrics:v0.5.0
+      ports:
+      - containerPort: 8080
+
+```
+为了和Prometheus Server对接，也要部署对应的Service。和node-exporter一样，这个Service也只开放了Cluster内部端口，不能直接从外部访问。
+```YAML
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: 'true'
+  name: kube-state-metrics
+  namespace: monitoring
+```
+
+
+
