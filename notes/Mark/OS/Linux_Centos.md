@@ -1,6 +1,51 @@
 
 # Linux Base
 
+## 系统常用基本配置
+### 修改时区
+```shell
+# 查看当前时区
+ls -l /etc/localtime
+# 修改为上海时区
+ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+```
+### 时间同步
+```shell
+yum install ntpdate -y
+ntpdate time.windows.com
+echo '*/5 * * * * ntpdate time.windows.com' >> 
+```
+
+### 测试机免密配置
+```shell
+#!/bin/bash
+
+set -e
+
+PubKey='xx'
+
+yum install ntpdate -y
+echo '*/5 * * * * ntpdate time.windows.com' /var/spool/cron/root
+
+useradd centos
+usermod centos -G wheel
+sed -i 's/^\(%wheel\s\+ALL=(ALL)\s\+ALL\)/# \1/' /etc/sudoers
+sed -i 's/^#\s*\(%wheel\s\+ALL=(ALL)\s\+NOPASSWD:\s\+ALL\)/\1/' /etc/sudoers
+
+mkdir /home/centos/.ssh
+chmod 700 /home/centos/.ssh
+echo ${PubKey} >> /home/centos/.ssh/authorized_keys
+chmod 600 /home/centos/.ssh/authorized_keys
+chown -R centos:centos /home/centos/.ssh
+
+# ssh 远程执行本地脚本
+ssh -o StrictHostKeyChecking=no root@192.168.36.202 bash -s < /home/centos/scripts/remote_init.sh
+
+# 命令补全
+yum -y install bash-completion
+```
+
+
 ## Centos7
 ### 文件系统结构
 
