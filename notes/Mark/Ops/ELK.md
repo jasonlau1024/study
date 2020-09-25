@@ -359,8 +359,323 @@ http.cors.allow-origin: "*"
 systemctl restart elasticsearch
 ```
 浏览器打开http://192.168.36.203:9100
+![1599717816953.png](https://github.com/jasonlau1024/study/blob/master/src/images/1599717816953.png?raw=true)
+
+**根据字段来查询：**
+数据浏览-->选择对应的索引及字段
+
+**复合查询：**
+![1599718427944.png](https://github.com/jasonlau1024/study/blob/master/src/images/1599718427944.png?raw=true)
 
 
+### Logstash
+#### 安装
+机器：`elk-lk`
+```shell
+# 安装OpenJDK
+yum install java-1.8.0-openjdk.x86_64 -y
+# 安装logstash
+yum install logstash -y  # 或 rpm -ivh logstash-7.9.1.rpm
+
+rpm -ql logstash | more
+
+cat >> /etc/profile <<EOF
+PATH=$PATH:/usr/share/logstash/bin
+export PATH
+EOF
+source /etc/profile
+logstash -V
+```
+#### logstash条件判断
+**比较操作符：**
+- 相等：==, !=, <, >, <=, >=
+- 正则：=~(匹配正则), !~(不匹配正则)
+- 包含：in(包含), not in(不包含)
+**布尔操作符：**
+and(与), or(或), nand(非与), xor(非或)
+**一元运算符：**
+!(取反)
+()(复合表达式), !()(对复合表达式结果取反)
+
+#### Input插件
+1) **Stdin**
+https://www.elastic.co/guide/en/logstash/current/plugins-inputs-stdin.html
+```shell
+cat > /etc/logstash/conf.d/test.conf << EOF
+input {
+  stdin {
+
+  }
+}
+filter {
+
+}
+output {
+  stdout {
+    codec => rubydebug
+  }
+}
+EOF
+# 测试配置文件
+logstash -t -f /etc/logstash/conf.d/test.conf
+... ...
+Configuration OK
+# 指定配置文件直接运行，键入123 345,形成timestamp日志，系统自动加入时间戳
+logstash -r -f /etc/logstash/conf.d/test.conf
+... ...
+[INFO ] 2020-09-10 02:48:20.405 [Api Webserver] agent - Successfully started Logstash API endpoint {:port=>9600}
+123
+{
+    "@timestamp" => 2020-09-10T06:48:29.664Z,
+          "host" => "elk-lk",
+      "@version" => "1",
+       "message" => "123"
+}
+456
+{
+    "@timestamp" => 2020-09-10T06:48:33.710Z,
+          "host" => "elk-lk",
+      "@version" => "1",
+       "message" => "456"
+}
+```
+2) **File**
+https://www.elastic.co/guide/en/logstash/current/plugins-inputs-file.html
+```shell
+cat > /etc/logstash/conf.d/test.conf <<EOF
+input {
+file {
+path =>"/var/log/messages"
+tags =>"123"
+type =>"syslog"
+}
+}
+filter {
+}
+output {
+stdout {
+codec => rubydebug
+}
+}
+EOF
+
+logstash -t -f /etc/logstash/conf.d/test.conf
+logstash -r -f /etc/logstash/conf.d/test.conf
+... ...
+{
+       "message" => "Sep 10 03:00:36 localhost yum[13094]: Installed: httpd-tools-2.4.6-93.el7.centos.x86_64",
+          "host" => "elk-lk",
+    "@timestamp" => 2020-09-10T07:00:37.809Z,
+          "tags" => [
+        [0] "123"
+    ],
+          "type" => "syslog",
+          "path" => "/var/log/messages",
+      "@version" => "1"
+}
+```
+3) **TCP**
+https://www.elastic.co/guide/en/logstash/current/plugins-inputs-tcp.html
+```shell
+cat > /etc/logstash/conf.d/test.conf <<EOF
+input {
+tcp {
+port =>12345
+type =>"nc"
+}
+}
+filter {
+}
+output {
+stdout {
+codec => rubydebug
+}
+}
+EOF
+# 运行
+logstash -r -f /etc/logstash/conf.d/test.conf
+
+# 在其它机器，通过nc发送TCP数据
+nc 192.168.36.202 12345
+1
+hello
+... ...
+```
+#### Codec常用插件
+https://www.elastic.co/guide/en/logstash/current/codec-plugins.html
+https://www.elastic.co/guide/en/logstash/current/plugins-codecs-multiline.html
+1) **Json/Json_lines示例**
+```shell
+cat > /etc/logstash/conf.d/test.conf << EOF
+input {
+stdin {
+codec =>json {
+charset => ["UTF-8"]
+}
+}
+}
+filter {
+}
+output {
+stdout {
+codec => rubydebug
+}
+}
+EOF
+logstash -r -f /etc/logstash/conf.d/test.conf
+... ...
+[INFO ] 2020-09-10 03:22:12.711 [Api Webserver] agent - Successfully started Logstash API endpoint {:port=>9600}
+# 粘贴如下内容，json必须为一行。回车就能识别出来json数据
+{"ip":"192.168.36.203","hostname":"elk-es01","method":"GET"}
+{
+      "hostname" => "elk-es01",
+        "method" => "GET",
+          "host" => "elk-lk",
+      "@version" => "1",
+    "@timestamp" => 2020-09-10T07:22:50.762Z,
+            "ip" => "192.168.36.203"
+}
+```
+2) **Multiline示例**
+日志可以按照特征进行聚合，避免报重复错误。
+```shell
+# pattern => "^\s"表示匹配以字符开头的行，what => "previous" 表示将不是以字符串开头的行聚合到上一行。
+cat > /etc/logstash/conf.d/test.conf << EOF
+input {
+  stdin {
+    codec => multiline {
+      pattern => "^\s"
+      what => "previous"
+    }
+  }
+}
+filter {
+}
+output {
+   stdout {
+     codec => rubydebug
+   }
+}
+EOF
+logstash -r -f /etc/logstash/conf.d/test.conf
+```
+#### Filter插件
+主要对日志进行结构化处理。
+https://www.elastic.co/guide/en/logstash/current/filter-plugins.html
+1) **json**
+https://www.elastic.co/guide/en/logstash/current/plugins-filters-json.html
+```shell
+cat > /etc/logstash/conf.d/test.conf <<EOF
+input {
+  stdin {
+  }
+}
+filter {
+  json {
+    source => "message"
+    target => "content"
+  }
+}
+output {
+  stdout {
+    codec => rubydebug
+  }
+}
+EOF
+logstash -r -f /etc/logstash/conf.d/test.conf
+... ...
+{"ip":"192.168.36.203","hostname":"elk-es01","method":"GET"}
+# 把message中的数据结构化到content中，test.conf明确指定了message结构化指定的字段名称。
+{
+      "@version" => "1",
+    "@timestamp" => 2020-09-10T09:15:00.542Z,
+       "content" => {
+              "ip" => "192.168.36.203",
+          "method" => "GET",
+        "hostname" => "elk-es01"
+    },
+          "host" => "elk-lk",
+       "message" => "{\"ip\":\"192.168.36.203\",\"hostname\":\"elk-es01\",\"method\":\"GET\"}"
+}
+```
+2) **KV**
+主要用于拆分一个字符串。
+https://www.elastic.co/guide/en/logstash/current/plugins-filters-kv.html
+```shell
+cat > /etc/logstash/conf.d/test.conf << EOF
+input {
+  stdin {
+  }
+}
+filter {
+  kv {
+    field_split => "&?"
+  }
+}
+output {
+  stdout {
+    codec => rubydebug
+  }
+}
+EOF
+pin=12345~0&d=123&e=foo@bar.com&oq=bobo&ss=12345?a=123
+# 配置文件指定了“&”和“?”作为分隔符，采用的是key=value进行解析
+{
+            "oq" => "bobo",
+       "message" => "pin=12345~0&d=123&e=foo@bar.com&oq=bobo&ss=12345?a=123",
+            "ss" => "12345",
+    "@timestamp" => 2020-09-10T09:18:35.303Z,
+           "pin" => "12345~0",
+             "a" => "123",
+      "@version" => "1",
+          "host" => "elk-lk",
+             "d" => "123",
+             "e" => "foo@bar.com"
+}
+# 修改配置文件field_split_pattern => ":+"，使用正则匹配，匹配1个或多个":"符号。
+k1=v1:k2=v2::k3=v3:::k4=v4
+{
+          "host" => "elk-lk",
+       "message" => "k1=v1:k2=v2::k3=v3:::k4=v4",
+            "k4" => "v4",
+            "k2" => "v2",
+            "k3" => "v3",
+      "@version" => "1",
+    "@timestamp" => 2020-09-10T09:26:50.800Z,
+            "k1" => "v1"
+}
+
+### GeoIP插件
+获取IP地理位置信息的插件。
+下载地址（免费版）：https://dev.maxmind.com/geoip/geoip2/geolite2/ 
+maxmind db binary 压缩包
+
+
+```shell
+cat > /etc/logstash/conf.d/test.conf << EOF
+input {
+  stdin {
+  }
+}
+filter {
+  grok {
+    match => {
+      "message" => "%{IP:client} %{WORD:method} %{URIPATHPARAM:request} %{NUMBER:bytes} %{NUMBER:duration}"
+    }
+  }
+  geoip {
+    source => "client"
+    database => "/opt/geoip/databases/GeoLite2-City.mmdb"
+  }
+}
+output {
+  stdout {
+    codec => rubydebug
+  }
+}
+EOF
+
+```
 
 
 

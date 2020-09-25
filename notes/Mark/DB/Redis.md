@@ -42,7 +42,6 @@ dir "/data/redis/rdb"   # 文件存储路径
 top-writes-on-bgsave-error yes  # 持久化异常，主进程停止写入。默认开启。
 rdbcompression no   # 数据压缩，建议关闭，Redis本身属于CPU密集型，相比硬盘成本，CPU更值钱。
 rdbchecksum yes # 导入数据校验，如果最求性能可以关闭。
-
 ```
 
 
@@ -56,7 +55,6 @@ appendfilename "appendonly.aof"      # AOF文件名称（默认）
 appendfsync everysec                       # AOF持久化策略，这里是每秒 fsync 一次
 auto-aof-rewrite-percentage 100      # 触发AOF文件重写的条件：当前AOF文件大小和最后一次重写后的大小之间的比率。如默认100代表当前AOF文件是上次重写的两倍时候才重写。
 auto-aof-rewrite-min-size 64mb       # 触发AOF文件重写的条件：只有当AOF文件大小大于该值时候才可能重写，默认是64MB
-
 ```
 
 
